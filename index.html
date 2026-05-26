@@ -2,804 +2,525 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>블록 블래스트</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>지하철 빈자리 - 눈치 게임</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap');
-
-        :root {
-            --bg-dark: #0f172a;
-            --board-bg: #1e293b;
-            --cell-empty: #334155;
-            --text-main: #f8fafc;
-            --primary-accent: #3b82f6;
-            
-            --c-red: #ef4444;
-            --c-orange: #f97316;
-            --c-yellow: #eab308;
-            --c-green: #22c55e;
-            --c-cyan: #06b6d4;
-            --c-blue: #3b82f6;
-            --c-purple: #a855f7;
-            --c-pink: #ec4899;
-            
-            --cell-size: min(10vw, 42px);
-            --cell-gap: 3px;
+        @keyframes train-shake {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-2px); }
+            100% { transform: translateY(1px); }
         }
-
-        * {
-            box-sizing: border-box;
-            user-select: none;
-            -webkit-user-select: none;
-            -webkit-touch-callout: none;
+        @keyframes passing-lights {
+            0% { background-position: 100% 0; }
+            100% { background-position: -100% 0; }
         }
 
         body {
-            margin: 0;
-            padding: 0;
-            background-color: var(--bg-dark);
-            color: var(--text-main);
-            font-family: 'Fredoka', sans-serif;
+            font-family: 'Malgun Gothic', sans-serif;
+            background-color: #121212;
             display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
-            overflow: hidden;
-            touch-action: none; /* Prevent scroll on drag */
-        }
-
-        #app {
-            width: 100%;
-            max-width: 500px;
-            display: flex;
-            flex-direction: column;
+            justify-content: center;
             align-items: center;
             height: 100vh;
-            padding: 20px 10px;
-            position: relative;
+            margin: 0;
+            overflow: hidden;
+            color: #333;
         }
 
-        /* Header / Score Area */
-        header {
-            width: 100%;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0 20px;
-            margin-bottom: 30px;
-        }
-
-        .title {
-            font-size: 24px;
-            font-weight: 700;
-            background: linear-gradient(to right, #3b82f6, #a855f7);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .score-box {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 10px 20px;
-            border-radius: 16px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-
-        .score-label {
-            font-size: 12px;
-            color: #94a3b8;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 2px;
-        }
-
-        .score-value {
-            font-size: 24px;
-            font-weight: 700;
-        }
-
-        /* Board Area */
-        #board-container {
-            background: var(--board-bg);
-            padding: var(--cell-gap);
-            border-radius: 12px;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
-            margin-bottom: auto; /* Push tray to bottom */
-            position: relative;
-        }
-
-        #board {
-            display: grid;
-            grid-template-columns: repeat(8, var(--cell-size));
-            grid-template-rows: repeat(8, var(--cell-size));
-            gap: var(--cell-gap);
-        }
-
-        .cell {
-            width: var(--cell-size);
-            height: var(--cell-size);
-            background-color: var(--cell-empty);
-            border-radius: 6px;
-            transition: all 0.2s ease;
-        }
-
-        .cell.filled {
-            box-shadow: inset 0 0 0 2px rgba(255,255,255,0.2), inset 0 0 10px rgba(0,0,0,0.1);
-        }
-
-        .cell.clearing {
-            animation: clearAnim 0.3s forwards;
-        }
-
-        @keyframes clearAnim {
-            0% { transform: scale(1); filter: brightness(1.5); }
-            50% { transform: scale(1.1); filter: brightness(2); }
-            100% { transform: scale(0); opacity: 0; }
-        }
-
-        .cell.shadow {
-            background-color: rgba(255, 255, 255, 0.2) !important;
-            box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.4);
-        }
-
-        /* Tray Area */
-        #tray {
-            width: 100%;
-            display: flex;
-            justify-content: space-evenly;
-            align-items: center;
-            height: 150px;
-            padding: 10px;
-            margin-bottom: 20px;
-        }
-
-        .tray-slot {
-            width: 30%;
-            height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        /* Block Shapes */
-        .shape-container {
-            display: flex;
-            flex-direction: column;
-            gap: var(--cell-gap);
-            cursor: grab;
-            transition: transform 0.2s;
-            position: relative;
-        }
-
-        .shape-container:active {
-            cursor: grabbing;
-        }
-
-        .shape-container.dragging {
-            position: fixed;
-            pointer-events: none;
-            z-index: 1000;
-            transition: none;
-            transform: scale(1) translateY(-60px); /* Offset for finger visibility */
-        }
-
-        .shape-container.in-tray {
-            transform: scale(0.6); /* Scale down for tray */
-        }
-
-        .shape-row {
-            display: flex;
-            gap: var(--cell-gap);
-        }
-
-        .shape-block {
-            width: var(--cell-size);
-            height: var(--cell-size);
-            border-radius: 6px;
-            box-shadow: inset 0 0 0 2px rgba(255,255,255,0.2), inset 0 0 10px rgba(0,0,0,0.1);
-        }
-
-        .shape-block.empty {
-            background: transparent !important;
-            box-shadow: none !important;
-        }
-
-        .shape-container.disabled {
-            opacity: 0.3;
-            filter: grayscale(100%);
-            pointer-events: none;
-        }
-
-        /* Game Over Overlay */
-        #game-over {
+        /* 오프닝 메인 메뉴 화면 */
+        #main-menu {
             position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(15, 23, 42, 0.85);
-            backdrop-filter: blur(5px);
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85);
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            z-index: 2000;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.5s;
-        }
-
-        #game-over.visible {
-            opacity: 1;
-            pointer-events: all;
-        }
-
-        #game-over h2 {
-            font-size: 40px;
-            margin-bottom: 10px;
-            color: var(--c-red);
-        }
-
-        #game-over p {
-            font-size: 20px;
-            margin-bottom: 30px;
-            color: #94a3b8;
-        }
-
-        .btn-restart {
-            background: linear-gradient(135deg, var(--c-blue), var(--c-purple));
+            z-index: 100;
             color: white;
-            border: none;
+            backdrop-filter: blur(5px);
+        }
+        .menu-box {
+            background: #1a252f;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            border: 4px solid #f1c40f;
+            box-shadow: 0 0 30px rgba(241, 196, 15, 0.3);
+            width: 450px;
+        }
+        .menu-box h1 {
+            color: #f1c40f;
+            margin-top: 0;
+            font-size: 32px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            margin-bottom: 15px;
+        }
+        
+        .rules-box {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: left;
+            margin-bottom: 25px;
+            border: 1px solid #7f8c8d;
+        }
+        .rules-box h3 {
+            margin: 0 0 10px 0;
+            color: #2ecc71;
+            font-size: 18px;
+            text-align: center;
+        }
+        .rules-box ul {
+            margin: 0;
+            padding-left: 20px;
+            font-size: 13.5px;
+            color: #bdc3c7;
+            line-height: 1.6;
+        }
+        .rules-box li b { color: #e74c3c; }
+
+        .difficulty-select {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 25px;
+        }
+        .diff-btn {
+            padding: 12px 20px;
+            border: 2px solid #555;
+            border-radius: 8px;
+            cursor: pointer;
+            background: #2c3e50;
+            color: white;
+            font-weight: bold;
+            transition: 0.2s;
+            flex: 1;
+        }
+        .diff-btn:hover { background: #34495e; }
+        .diff-btn.selected {
+            border-color: #f1c40f;
+            background: #e67e22;
+            box-shadow: 0 0 15px rgba(230, 126, 34, 0.5);
+        }
+        .start-btn {
             padding: 15px 40px;
             font-size: 20px;
-            font-family: inherit;
-            font-weight: 600;
-            border-radius: 30px;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
-            transition: transform 0.1s, box-shadow 0.1s;
-        }
-
-        .btn-restart:active {
-            transform: scale(0.95);
-        }
-
-        /* Popup Score Anim */
-        .score-popup {
-            position: absolute;
+            background: #2ecc71;
             color: white;
-            font-weight: 700;
-            font-size: 24px;
-            pointer-events: none;
-            z-index: 500;
-            animation: floatUp 1s ease-out forwards;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+            transition: 0.2s;
+        }
+        .start-btn:hover { background: #27ae60; transform: scale(1.05); }
+
+        /* 지하철 내부 컨테이너 */
+        #train-interior {
+            display: none;
+            background: linear-gradient(to bottom, #d5d5d5, #eeeeee, #bfbfbf);
+            width: 850px;
+            height: 520px;
+            border-radius: 20px;
+            box-shadow: inset 0 0 60px rgba(0,0,0,0.6), 0 10px 40px rgba(0,0,0,0.9);
+            position: relative;
+            animation: train-shake 0.25s infinite alternate ease-in-out;
+            overflow: hidden;
         }
 
-        @keyframes floatUp {
-            0% { transform: translateY(0) scale(1); opacity: 1; }
-            100% { transform: translateY(-50px) scale(1.5); opacity: 0; }
+        .window-container {
+            position: absolute; top: 40px; left: 50%; transform: translateX(-50%);
+            width: 750px; height: 130px; background-color: #050505;
+            border: 8px solid #777; border-radius: 10px; box-sizing: border-box;
+            background-image: repeating-linear-gradient(90deg, transparent 0px, transparent 150px, rgba(255,255,200,0.15) 150px, rgba(255,255,200,0.15) 200px);
+            background-size: 200% 100%; animation: passing-lights 0.8s linear infinite;
         }
 
+        .handles {
+            position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+            width: 750px; display: flex; justify-content: space-around;
+        }
+        .handle {
+            width: 24px; height: 45px; border: 5px solid #e67e22;
+            border-top: none; border-radius: 0 0 24px 24px; position: relative;
+        }
+        .handle::before { content: ''; position: absolute; top: -20px; left: 9px; width: 6px; height: 20px; background-color: #444; }
+
+        .seats-container {
+            position: absolute; bottom: 130px; left: 50%; transform: translateX(-50%);
+            display: flex; width: 800px; background-color: #bbb;
+            padding: 12px 6px; border-radius: 12px 12px 0 0; border-bottom: 6px solid #666;
+        }
+        
+        .seat {
+            flex: 1; background: linear-gradient(to bottom, #009040, #005a25);
+            margin: 0 3px; height: 130px; border-radius: 6px 6px 0 0;
+            display: flex; flex-direction: column; justify-content: center;
+            align-items: center; color: white; cursor: pointer;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.4), 0 5px 5px rgba(0,0,0,0.2);
+            transition: all 0.1s; position: relative;
+        }
+        .seat:hover { filter: brightness(1.25); transform: translateY(-2px); }
+        .seat:active { transform: scale(0.95); }
+        
+        .passenger-state {
+            font-size: 14px; text-align: center; padding: 5px; font-weight: bold;
+            text-shadow: 2px 2px 3px rgba(0,0,0,0.9); line-height: 1.4;
+        }
+
+        .alert-icon {
+            position: absolute; top: -30px; font-size: 24px;
+            display: none; text-shadow: 0 0 5px rgba(255,255,255,0.8);
+        }
+
+        .ui-bar {
+            position: absolute; bottom: 0; width: 100%; height: 130px;
+            background-color: #1a252f; color: white; display: flex;
+            justify-content: space-between; padding: 15px 25px; box-sizing: border-box;
+            border-top: 3px solid #000;
+        }
+
+        .status-panel { width: 30%; display: flex; flex-direction: column; justify-content: center; }
+        .gauge-bg { width: 100%; height: 18px; background: #444; border-radius: 10px; margin-top: 8px; overflow: hidden; border: 1px solid #777; }
+        #awkward-bar { height: 100%; width: 0%; background: #e74c3c; transition: width 0.2s; }
+        
+        .log-panel { width: 45%; background: #0b1116; padding: 12px; border-radius: 8px; font-size: 13px; overflow-y: auto; color: #ecf0f1; line-height: 1.6; height: 80px; border: 1px solid #34495e; }
+        
+        .skill-panel { width: 22%; display: flex; flex-direction: column; gap: 8px; justify-content: center; }
+        button.action-btn { padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; transition: 0.2s; }
+        .btn-ignore { background: #7f8c8d; color: white; }
+        .btn-ignore:hover { background: #95a5a6; }
+        .btn-skill { background: #8e44ad; color: white; box-shadow: 0 0 10px rgba(142,68,173,0.5); }
+        .btn-skill:hover { background: #9b59b6; }
+        .btn-skill:disabled { background: #555; color: #888; box-shadow: none; cursor: not-allowed; }
+        
+        .penalty-warning { color: #f39c12; font-weight: bold; }
+        .penalty-danger { color: #e74c3c; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div id="app">
-    <header>
-        <div class="title">BLOCK BLAST</div>
-        <div class="score-box">
-            <div class="score-label">Score</div>
-            <div class="score-value" id="score">0</div>
+<div id="main-menu">
+    <div class="menu-box">
+        <h1>🚇 지하철 빈자리</h1>
+        
+        <div class="rules-box">
+            <h3>📖 게임 규칙</h3>
+            <ul>
+                <li>승객들의 <b>진짜 하차 신호</b>를 눈치껏 파악해 빈자리를 쟁취하세요.</li>
+                <li>앉지 못하고 <b>오래 서 있을수록</b> 민망 게이지가 <b>지속적으로 상승</b>합니다.</li>
+                <li><b>[패널티] 환승각 계산(스캔)</b>은 사람들을 대놓고 관찰하므로 <b>사용 즉시 민망함이 15 상승</b>합니다.</li>
+                <li>'딴청 피우기'는 <b>4연속 사용 시</b> 이상한 사람으로 몰려 페널티(+25)를 받습니다.</li>
+            </ul>
+            <div style="margin-top: 10px; text-align: center; color: #f1c40f; font-weight: bold; font-size: 15px;">
+                🏆 내 최고 기록: <span id="menu-highscore">0</span>회
+            </div>
         </div>
-    </header>
-
-    <div id="board-container">
-        <div id="board"></div>
+        
+        <div class="difficulty-select">
+            <button class="diff-btn selected" id="diff-normal" onclick="selectDifficulty('normal')">
+                일반 모드<br><span style="font-size:11px; font-weight:normal;">(조금 여유로움)</span>
+            </button>
+            <button class="diff-btn" id="diff-hard" onclick="selectDifficulty('hard')">
+                지옥 모드<br><span style="font-size:11px; font-weight:normal;">(페이크 남발 / 빠른 게이지)</span>
+            </button>
+        </div>
+        
+        <button class="start-btn" onclick="startGame()">게임 시작</button>
     </div>
+</div>
 
-    <div id="tray">
-        <div class="tray-slot" id="slot-0"></div>
-        <div class="tray-slot" id="slot-1"></div>
-        <div class="tray-slot" id="slot-2"></div>
+<div id="train-interior">
+    <div class="handles">
+        <div class="handle"></div><div class="handle"></div><div class="handle"></div>
+        <div class="handle"></div><div class="handle"></div><div class="handle"></div>
     </div>
+    
+    <div class="window-container"></div>
+    <div class="seats-container" id="seats-container"></div>
 
-    <div id="game-over">
-        <h2>GAME OVER</h2>
-        <p>Final Score: <span id="final-score">0</span></p>
-        <button class="btn-restart" onclick="initGame()">PLAY AGAIN</button>
+    <div class="ui-bar">
+        <div class="status-panel">
+            <div style="display: flex; justify-content: space-between; font-weight: bold;">
+                <span style="color: #2ecc71; font-size: 16px;">현재: <span id="score">0</span>회</span>
+                <span style="color: #f1c40f; font-size: 16px;">최고: <span id="game-highscore">0</span>회</span>
+            </div>
+            <div style="margin-top: 10px; font-size: 14px; color: #e74c3c; font-weight: bold;">민망 게이지: <span id="awkward-text">0</span>%</div>
+            <div class="gauge-bg"><div id="awkward-bar"></div></div>
+        </div>
+        
+        <div class="log-panel" id="log"></div>
+
+        <div class="skill-panel">
+            <button class="action-btn btn-ignore" id="ignore-btn" onclick="useIgnoreSkill()">딴청 피우기 <span id="ignore-counter">(0/3)</span></button>
+            <button class="action-btn btn-skill" id="scan-btn" onclick="useScanSkill()">환승각 계산 (스캔)</button>
+        </div>
     </div>
 </div>
 
 <script>
-    // --- Game Data & Configuration ---
-    const BOARD_SIZE = 8;
-    const SHAPES = [
-        // 1x1
-        { grid: [[1]], color: 'var(--c-cyan)' },
-        // 2x2
-        { grid: [[1,1],[1,1]], color: 'var(--c-yellow)' },
-        // 3x3
-        { grid: [[1,1,1],[1,1,1],[1,1,1]], color: 'var(--c-red)' },
-        
-        // Lines
-        { grid: [[1,1]], color: 'var(--c-green)' },
-        { grid: [[1],[1]], color: 'var(--c-green)' },
-        { grid: [[1,1,1]], color: 'var(--c-blue)' },
-        { grid: [[1],[1],[1]], color: 'var(--c-blue)' },
-        { grid: [[1,1,1,1]], color: 'var(--c-purple)' },
-        { grid: [[1],[1],[1],[1]], color: 'var(--c-purple)' },
-        { grid: [[1,1,1,1,1]], color: 'var(--c-orange)' },
-        { grid: [[1],[1],[1],[1],[1]], color: 'var(--c-orange)' },
-        
-        // L-shapes small
-        { grid: [[1,1],[1,0]], color: 'var(--c-pink)' },
-        { grid: [[1,1],[0,1]], color: 'var(--c-pink)' },
-        { grid: [[1,0],[1,1]], color: 'var(--c-pink)' },
-        { grid: [[0,1],[1,1]], color: 'var(--c-pink)' },
-        
-        // L-shapes big
-        { grid: [[1,1,1],[1,0,0],[1,0,0]], color: 'var(--c-cyan)' },
-        { grid: [[1,1,1],[0,0,1],[0,0,1]], color: 'var(--c-cyan)' },
-        { grid: [[1,0,0],[1,0,0],[1,1,1]], color: 'var(--c-cyan)' },
-        { grid: [[0,0,1],[0,0,1],[1,1,1]], color: 'var(--c-cyan)' },
+    let currentDifficulty = 'normal';
+    let baseInterval = 1800; 
+    let fakeMultiplier = 0.5; 
+    let passiveAwkwardness = 3; 
 
-        // T-shapes
-        { grid: [[1,1,1],[0,1,0]], color: 'var(--c-yellow)' },
-        { grid: [[0,1,0],[1,1,1]], color: 'var(--c-yellow)' },
-        { grid: [[1,0],[1,1],[1,0]], color: 'var(--c-yellow)' },
-        { grid: [[0,1],[1,1],[0,1]], color: 'var(--c-yellow)' },
-
-        // Z-shapes
-        { grid: [[1,1,0],[0,1,1]], color: 'var(--c-green)' },
-        { grid: [[0,1,1],[1,1,0]], color: 'var(--c-green)' },
-        { grid: [[1,0],[1,1],[0,1]], color: 'var(--c-green)' },
-        { grid: [[0,1],[1,1],[1,0]], color: 'var(--c-green)' }
+    const BEHAVIORS = [
+        { text: "😴 깊은 숙면 중", realProb: 0.1, fakeProb: 0.1, danger: 20, fakeMsg: "자다 깨서 기지개를 켠 것뿐이었습니다!" },
+        { text: "📱 폰 몰입 중", realProb: 0.1, fakeProb: 0.1, danger: 15, fakeMsg: "핸드폰 배터리가 없어 가방에 넣었을 뿐입니다." },
+        { text: "🦵 다리 풀기", realProb: 0.2, fakeProb: 0.5, danger: 25, fakeMsg: "다리가 저려서 자세만 바꿨습니다." },
+        { text: "🎒 가방 뒤적거림", realProb: 0.3, fakeProb: 0.7, danger: 40, fakeMsg: "가방에서 에어팟을 꺼냈을 뿐 안 내립니다!" },
+        { text: "👀 문 쪽 힐끗", realProb: 0.4, fakeProb: 0.5, danger: 35, fakeMsg: "내릴 준비가 아니라 노선도를 본 거였습니다!" },
+        { text: "💼 짐 챙기는 중", realProb: 0.5, fakeProb: 0.4, danger: 30, fakeMsg: "짐을 고쳐 멨을 뿐입니다. 페이크에 당했습니다!" },
+        { text: "🎧 이어폰 정리", realProb: 0.6, fakeProb: 0.3, danger: 20, fakeMsg: "노래만 끄고 계속 앉아있습니다." }
     ];
 
-    let board = [];
+    let seats = new Array(7).fill(null);
     let score = 0;
-    let availableShapes = [null, null, null]; // Objects representing active shapes in tray
-    
-    // DOM Elements
-    const boardEl = document.getElementById('board');
-    const scoreEl = document.getElementById('score');
-    const gameOverEl = document.getElementById('game-over');
-    const finalScoreEl = document.getElementById('final-score');
-    const boardContainer = document.getElementById('board-container');
+    let highScore = 0; // 최고기록 변수
+    let awkwardness = 0;
+    let ignoreCount = 0; 
+    let gameInterval;
+    let scanActive = false;
+    let isGameOver = false;
 
-    let draggedElement = null;
-    let draggedShapeData = null;
-    let dragOffsetX = 0;
-    let dragOffsetY = 0;
-    let initialX = 0;
-    let initialY = 0;
-    let currentSlotIndex = -1;
-    let shadowCells = [];
+    // 💡 페이지 로드 시 백엔드 데이터(LocalStorage) 불러오기
+    window.onload = function() {
+        highScore = localStorage.getItem('subway_game_highscore') || 0;
+        document.getElementById('menu-highscore').innerText = highScore;
+        document.getElementById('game-highscore').innerText = highScore;
+    }
 
-    // --- Initialization ---
+    function selectDifficulty(level) {
+        document.getElementById('diff-normal').classList.remove('selected');
+        document.getElementById('diff-hard').classList.remove('selected');
+        
+        if(level === 'normal') {
+            document.getElementById('diff-normal').classList.add('selected');
+            currentDifficulty = 'normal';
+            baseInterval = 1800;
+            fakeMultiplier = 0.5;
+            passiveAwkwardness = 3; 
+        } else {
+            document.getElementById('diff-hard').classList.add('selected');
+            currentDifficulty = 'hard';
+            baseInterval = 1200;
+            fakeMultiplier = 1.0;
+            passiveAwkwardness = 5; 
+        }
+    }
+
+    function startGame() {
+        document.getElementById('main-menu').style.display = 'none';
+        document.getElementById('train-interior').style.display = 'block';
+        
+        const modeText = currentDifficulty === 'normal' ? '일반 모드' : '지옥 모드';
+        addLog(`[시스템] ${modeText}를 시작합니다.`);
+        
+        initGame();
+    }
+
     function initGame() {
-        board = Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill(null));
-        score = 0;
-        updateScore();
-        gameOverEl.classList.remove('visible');
+        const container = document.getElementById('seats-container');
+        container.innerHTML = '';
+        for (let i = 0; i < 7; i++) {
+            seats[i] = generatePassenger();
+            const seatDiv = document.createElement('div');
+            seatDiv.className = 'seat';
+            seatDiv.id = `seat-${i}`;
+            seatDiv.onclick = () => trySit(i);
+            
+            seatDiv.innerHTML = `
+                <div class="alert-icon" id="alert-${i}">❗</div>
+                <div class="passenger-state" id="state-${i}">${seats[i].text}</div>
+            `;
+            container.appendChild(seatDiv);
+        }
         
-        renderBoard();
-        fillTray();
+        gameInterval = setInterval(updateSubway, baseInterval);
     }
 
-    function renderBoard() {
-        boardEl.innerHTML = '';
-        for (let r = 0; r < BOARD_SIZE; r++) {
-            for (let c = 0; c < BOARD_SIZE; c++) {
-                const cell = document.createElement('div');
-                cell.className = 'cell';
-                cell.dataset.r = r;
-                cell.dataset.c = c;
-                if (board[r][c]) {
-                    cell.classList.add('filled');
-                    cell.style.backgroundColor = board[r][c];
+    function generatePassenger() {
+        const base = BEHAVIORS[Math.floor(Math.random() * BEHAVIORS.length)];
+        const rand = Math.random();
+        const adjustedFakeProb = base.fakeProb * fakeMultiplier;
+
+        let actualType;
+        if (rand < base.realProb) actualType = "LEAVE";
+        else if (rand < base.realProb + adjustedFakeProb) actualType = "FAKE";
+        else actualType = "STAY";
+
+        return { text: base.text, type: actualType, danger: base.danger, fakeMsg: base.fakeMsg };
+    }
+
+    function updateSubway() {
+        if (isGameOver) return;
+
+        for (let i = 0; i < 7; i++) {
+            if (seats[i].type === "EMPTY") {
+                if (Math.random() < 0.6) {
+                    addLog(`[돌발] 빈자리를 '순간가속 할머니'가 차지했습니다!`);
+                    seats[i] = generatePassenger();
                 }
-                boardEl.appendChild(cell);
+            } else {
+                if (Math.random() < 0.35) {
+                    seats[i] = generatePassenger();
+                }
             }
+            renderSeat(i);
         }
-    }
-
-    function updateScore(add = 0, x, y) {
-        score += add;
-        scoreEl.innerText = score;
+        scanActive = false; 
         
-        if (add > 0 && x !== undefined && y !== undefined) {
-            showScorePopup(add, x, y);
-        }
-    }
-
-    function showScorePopup(amount, x, y) {
-        const popup = document.createElement('div');
-        popup.className = 'score-popup';
-        popup.innerText = '+' + amount;
-        popup.style.left = x + 'px';
-        popup.style.top = y + 'px';
-        document.body.appendChild(popup);
-        setTimeout(() => popup.remove(), 1000);
-    }
-
-    // --- Shape & Tray Logic ---
-    function getRandomShape() {
-        const shapeDef = SHAPES[Math.floor(Math.random() * SHAPES.length)];
-        return {
-            grid: shapeDef.grid,
-            color: shapeDef.color,
-            rows: shapeDef.grid.length,
-            cols: shapeDef.grid[0].length
-        };
-    }
-
-    function fillTray() {
-        let emptyCount = 0;
-        for (let i = 0; i < 3; i++) {
-            if (!availableShapes[i]) emptyCount++;
-        }
+        awkwardness += passiveAwkwardness; 
         
-        if (emptyCount === 3) {
-            for (let i = 0; i < 3; i++) {
-                availableShapes[i] = getRandomShape();
-                renderTrayShape(i);
-            }
-            checkGameOver();
+        if (Math.random() < 0.2) {
+            addLog(`<span style="color:#f39c12;">[시스템] 빈자리를 찾지 못해 서성이자, 사람들의 시선이 느껴집니다. (게이지 상승)</span>`);
+        }
+
+        updateGauge();
+        checkGameOver();
+    }
+
+    function renderSeat(index) {
+        const stateDiv = document.getElementById(`state-${index}`);
+        const alertIcon = document.getElementById(`alert-${index}`);
+        
+        stateDiv.innerText = seats[index].text;
+        
+        if (scanActive) {
+            if (seats[index].type === "FAKE") alertIcon.innerText = "❌";
+            else if (seats[index].type === "LEAVE") alertIcon.innerText = "⭕";
+            else alertIcon.innerText = "";
+            alertIcon.style.display = "block";
         } else {
-            checkGameOver();
+            alertIcon.style.display = "none";
         }
     }
 
-    function createShapeElement(shapeData) {
-        const container = document.createElement('div');
-        container.className = 'shape-container in-tray';
+    function trySit(index) {
+        if (isGameOver) return;
+
+        const target = seats[index];
         
-        for (let r = 0; r < shapeData.rows; r++) {
-            const rowEl = document.createElement('div');
-            rowEl.className = 'shape-row';
-            for (let c = 0; c < shapeData.cols; c++) {
-                const blockEl = document.createElement('div');
-                blockEl.className = 'shape-block';
-                if (shapeData.grid[r][c]) {
-                    blockEl.style.backgroundColor = shapeData.color;
-                } else {
-                    blockEl.classList.add('empty');
-                }
-                rowEl.appendChild(blockEl);
-            }
-            container.appendChild(rowEl);
-        }
-        return container;
-    }
-
-    function renderTrayShape(index) {
-        const slot = document.getElementById(`slot-${index}`);
-        slot.innerHTML = '';
-        if (availableShapes[index]) {
-            const el = createShapeElement(availableShapes[index]);
-            el.dataset.index = index;
+        if (target.type === "LEAVE" || target.type === "EMPTY") {
+            addLog(`🟢 [성공] ${index+1}번 승객이 내렸습니다! 눈치 싸움 승리.`);
+            score++;
+            document.getElementById('score').innerText = score;
             
-            // Event Listeners for Dragging
-            el.addEventListener('pointerdown', onDragStart);
-            slot.appendChild(el);
-        }
-    }
-
-    // --- Drag & Drop Logic ---
-    function onDragStart(e) {
-        if (e.button !== 0 && e.type !== 'touchstart' && e.pointerType === 'mouse' && e.button !== 0) return;
-        
-        draggedElement = e.currentTarget;
-        currentSlotIndex = parseInt(draggedElement.dataset.index);
-        draggedShapeData = availableShapes[currentSlotIndex];
-        
-        if (draggedElement.classList.contains('disabled')) {
-            draggedElement = null;
-            return;
-        }
-
-        const rect = draggedElement.getBoundingClientRect();
-        
-        // Remove from slot, append to body for absolute positioning
-        document.body.appendChild(draggedElement);
-        
-        // Switch classes
-        draggedElement.classList.remove('in-tray');
-        draggedElement.classList.add('dragging');
-
-        // Calculate offset so finger/mouse is roughly at the center of the shape
-        dragOffsetX = rect.width / 2;
-        dragOffsetY = rect.height / 2;
-
-        initialX = e.clientX;
-        initialY = e.clientY;
-
-        moveElement(e.clientX, e.clientY);
-
-        document.addEventListener('pointermove', onDragMove);
-        document.addEventListener('pointerup', onDragEnd);
-        document.addEventListener('pointercancel', onDragEnd);
-    }
-
-    function moveElement(x, y) {
-        if (!draggedElement) return;
-        // Position shape taking into account the transform offset in CSS
-        draggedElement.style.left = `${x - draggedOffsetX()}px`;
-        draggedElement.style.top = `${y - draggedOffsetY()}px`;
-        
-        updateShadow(x, y);
-    }
-    
-    function draggedOffsetX() {
-        return draggedElement.offsetWidth / 2;
-    }
-    function draggedOffsetY() {
-        // We have a translateY(-60px) in css for dragging, but we position based on left/top.
-        // We want the cursor to hold the shape nicely.
-        return draggedElement.offsetHeight / 2;
-    }
-
-    function onDragMove(e) {
-        if (!draggedElement) return;
-        e.preventDefault(); // Prevent scrolling on touch
-        moveElement(e.clientX, e.clientY);
-    }
-
-    function onDragEnd(e) {
-        if (!draggedElement) return;
-        document.removeEventListener('pointermove', onDragMove);
-        document.removeEventListener('pointerup', onDragEnd);
-        document.removeEventListener('pointercancel', onDragEnd);
-
-        clearShadow();
-
-        const boardPos = getBoardCellFromPointer(e.clientX, e.clientY);
-        
-        if (boardPos && canPlaceShape(draggedShapeData, boardPos.r, boardPos.c)) {
-            // Place on board
-            placeShape(draggedShapeData, boardPos.r, boardPos.c);
-            draggedElement.remove();
-            availableShapes[currentSlotIndex] = null;
-            
-            checkLines();
-            fillTray();
-        } else {
-            // Snap back
-            const slot = document.getElementById(`slot-${currentSlotIndex}`);
-            draggedElement.classList.remove('dragging');
-            draggedElement.classList.add('in-tray');
-            draggedElement.style.left = '';
-            draggedElement.style.top = '';
-            slot.appendChild(draggedElement);
-        }
-
-        draggedElement = null;
-        draggedShapeData = null;
-    }
-
-    // --- Placement & Collision ---
-    function getBoardCellFromPointer(clientX, clientY) {
-        // Adjust for the translateY offset applied in CSS to the dragging element
-        const yOffset = -60; 
-        const adjustedY = clientY + yOffset;
-        const adjustedX = clientX;
-
-        // Get board bounding box
-        const boardRect = boardEl.getBoundingClientRect();
-        
-        // Calculate relative position to top-left of the board
-        // Need to account for the shape's center
-        const cellSize = (boardRect.width - varValue('--cell-gap') * 7) / 8;
-        const gap = varValue('--cell-gap');
-        const cellFullSize = cellSize + gap;
-
-        // Calculate shape dimensions
-        const shapeWidth = draggedShapeData.cols * cellSize + (draggedShapeData.cols - 1) * gap;
-        const shapeHeight = draggedShapeData.rows * cellSize + (draggedShapeData.rows - 1) * gap;
-
-        // Top left of the shape relative to viewport
-        const shapeLeft = adjustedX - shapeWidth / 2;
-        const shapeTop = adjustedY - shapeHeight / 2;
-
-        // Relative to board
-        const relX = shapeLeft - boardRect.left;
-        const relY = shapeTop - boardRect.top;
-
-        // Approximate cell index
-        const c = Math.round(relX / cellFullSize);
-        const r = Math.round(relY / cellFullSize);
-
-        if (r >= -2 && r < BOARD_SIZE && c >= -2 && c < BOARD_SIZE) {
-            return { r, c };
-        }
-        return null;
-    }
-    
-    function varValue(name) {
-        return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name));
-    }
-
-    function canPlaceShape(shape, startR, startC) {
-        for (let r = 0; r < shape.rows; r++) {
-            for (let c = 0; c < shape.cols; c++) {
-                if (shape.grid[r][c]) {
-                    const br = startR + r;
-                    const bc = startC + c;
-                    if (br < 0 || br >= BOARD_SIZE || bc < 0 || bc >= BOARD_SIZE) return false; // Out of bounds
-                    if (board[br][bc] !== null) return false; // Collision
-                }
+            // 💡 최고 기록 실시간 업데이트 및 저장
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('subway_game_highscore', highScore);
+                document.getElementById('game-highscore').innerText = highScore;
             }
-        }
-        return true;
-    }
 
-    function updateShadow(x, y) {
-        clearShadow();
-        const pos = getBoardCellFromPointer(x, y);
-        if (pos && canPlaceShape(draggedShapeData, pos.r, pos.c)) {
-            for (let r = 0; r < draggedShapeData.rows; r++) {
-                for (let c = 0; c < draggedShapeData.cols; c++) {
-                    if (draggedShapeData.grid[r][c]) {
-                        const cell = getCellEl(pos.r + r, pos.c + c);
-                        if (cell) {
-                            cell.classList.add('shadow');
-                            shadowCells.push(cell);
-                        }
-                    }
-                }
-            }
-        }
-    }
+            awkwardness = Math.max(0, awkwardness - 40);
+            ignoreCount = 0; 
+            updateIgnoreUI();
 
-    function clearShadow() {
-        shadowCells.forEach(cell => cell.classList.remove('shadow'));
-        shadowCells = [];
-    }
-
-    function getCellEl(r, c) {
-        if (r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE) {
-            return boardEl.children[r * BOARD_SIZE + c];
-        }
-        return null;
-    }
-
-    function placeShape(shape, startR, startC) {
-        let blocksPlaced = 0;
-        for (let r = 0; r < shape.rows; r++) {
-            for (let c = 0; c < shape.cols; c++) {
-                if (shape.grid[r][c]) {
-                    board[startR + r][startC + c] = shape.color;
-                    blocksPlaced++;
-                    const cell = getCellEl(startR + r, startC + c);
-                    cell.classList.add('filled');
-                    cell.style.backgroundColor = shape.color;
-                }
-            }
-        }
-        // Score for placing: 10 per block
-        const rect = boardEl.getBoundingClientRect();
-        updateScore(blocksPlaced * 10, rect.left + rect.width/2, rect.top + rect.height/2);
-    }
-
-    // --- Line Clearing ---
-    function checkLines() {
-        let rowsToClear = [];
-        let colsToClear = [];
-
-        // Check rows
-        for (let r = 0; r < BOARD_SIZE; r++) {
-            if (board[r].every(cell => cell !== null)) {
-                rowsToClear.push(r);
-            }
-        }
-
-        // Check cols
-        for (let c = 0; c < BOARD_SIZE; c++) {
-            let colFull = true;
-            for (let r = 0; r < BOARD_SIZE; r++) {
-                if (board[r][c] === null) {
-                    colFull = false;
-                    break;
-                }
-            }
-            if (colFull) colsToClear.push(c);
-        }
-
-        if (rowsToClear.length > 0 || colsToClear.length > 0) {
-            clearLines(rowsToClear, colsToClear);
-        }
-    }
-
-    function clearLines(rows, cols) {
-        let cellsToClear = new Set();
-        
-        rows.forEach(r => {
-            for (let c = 0; c < BOARD_SIZE; c++) cellsToClear.add(`${r},${c}`);
-        });
-        
-        cols.forEach(c => {
-            for (let r = 0; r < BOARD_SIZE; r++) cellsToClear.add(`${r},${c}`);
-        });
-
-        // Animation
-        cellsToClear.forEach(pos => {
-            const [r, c] = pos.split(',').map(Number);
-            const cell = getCellEl(r, c);
-            cell.classList.add('clearing');
-        });
-
-        // Update logic board immediately, wait for anim to clean UI
-        cellsToClear.forEach(pos => {
-            const [r, c] = pos.split(',').map(Number);
-            board[r][c] = null;
-        });
-
-        // Score: lines * 100 + combo multiplier
-        const linesCleared = rows.length + cols.length;
-        const comboBonus = linesCleared > 1 ? linesCleared * 50 : 0;
-        const rect = boardEl.getBoundingClientRect();
-        
-        setTimeout(() => {
-            updateScore(linesCleared * 100 + comboBonus, rect.left + rect.width/2, rect.top + rect.height/2);
-            cellsToClear.forEach(pos => {
-                const [r, c] = pos.split(',').map(Number);
-                const cell = getCellEl(r, c);
-                cell.className = 'cell'; // reset
-                cell.style.backgroundColor = '';
-            });
-        }, 300);
-    }
-
-    // --- Game Over ---
-    function checkGameOver() {
-        let canPlay = false;
-        
-        // Update visual disabled state of tray items
-        for (let i = 0; i < 3; i++) {
-            const shape = availableShapes[i];
-            const slot = document.getElementById(`slot-${i}`);
-            const el = slot.firstChild;
-            
-            if (shape) {
-                let canPlace = false;
-                // Check all cells
-                for (let r = 0; r < BOARD_SIZE; r++) {
-                    for (let c = 0; c < BOARD_SIZE; c++) {
-                        if (canPlaceShape(shape, r, c)) {
-                            canPlace = true;
-                            break;
-                        }
-                    }
-                    if (canPlace) break;
-                }
-                
-                if (canPlace) {
-                    canPlay = true;
-                    if (el) el.classList.remove('disabled');
-                } else {
-                    if (el) el.classList.add('disabled');
-                }
-            }
-        }
-
-        if (!canPlay && availableShapes.some(s => s !== null)) {
-            // Wait slightly for any ongoing animations
+            seats[index] = { text: "😎 내가 앉음", type: "STAY", danger: 0, fakeMsg: "" };
             setTimeout(() => {
-                gameOver();
-            }, 500);
+                seats[index] = generatePassenger();
+            }, 2000);
+            
+            clearInterval(gameInterval);
+            let speedDec = currentDifficulty === 'normal' ? 30 : 60;
+            let newSpeed = Math.max(700, baseInterval - (score * speedDec)); 
+            gameInterval = setInterval(updateSubway, newSpeed);
+            
+        } else if (target.type === "FAKE") {
+            addLog(`💥 [치명적 낚시] ${target.fakeMsg} 시선이 집중됩니다!`);
+            awkwardness += (target.danger + 10);
+        } else {
+            addLog(`❌ [실패] 헛다리 짚었습니다. 앞에 멀뚱히 서 있게 됩니다.`);
+            awkwardness += target.danger;
+        }
+        
+        renderSeat(index);
+        updateGauge();
+        checkGameOver();
+    }
+
+    function useIgnoreSkill() {
+        if (isGameOver) return;
+        
+        ignoreCount++;
+        
+        if (ignoreCount > 3) {
+            addLog(`<span class="penalty-danger">📵 [부작용] 계속 폰만 보는 척하자 주변에서 이상하게 쳐다봅니다! 민망함 폭증!</span>`);
+            awkwardness += 25; 
+        } else {
+            addLog(`📱 핸드폰으로 바쁜 척하며 시선을 피합니다. (민망함 감소)`);
+            awkwardness = Math.max(0, awkwardness - 15);
+            if(ignoreCount === 3) {
+                addLog(`<span class="penalty-warning">⚠️ [경고] 딴청 피우기를 너무 많이 사용했습니다. 1번만 더 쓰면 의심받습니다.</span>`);
+            }
+        }
+        
+        updateIgnoreUI();
+        updateGauge();
+        checkGameOver();
+    }
+    
+    function updateIgnoreUI() {
+        const counterSpan = document.getElementById('ignore-counter');
+        if (ignoreCount >= 3) {
+            counterSpan.innerHTML = `<span style="color:#e74c3c;">(위험)</span>`;
+        } else {
+            counterSpan.innerText = `(${ignoreCount}/3)`;
         }
     }
 
-    function gameOver() {
-        finalScoreEl.innerText = score;
-        gameOverEl.classList.add('visible');
+    // 💡 환승각 계산 불이익(패널티) 시스템 추가
+    function useScanSkill() {
+        if (isGameOver) return;
+        const btn = document.getElementById('scan-btn');
+        btn.disabled = true;
+        
+        // 불이익 부여: 너무 티나게 스캔해서 민망 게이지 상승
+        addLog(`<span class="penalty-danger">👁️ [패널티] 사람들을 너무 유심히 쳐다보아 주변의 따가운 눈총을 받았습니다! (민망함 +15)</span>`);
+        awkwardness += 15;
+        updateGauge();
+        checkGameOver();
+        
+        // 게이지 폭발로 게임오버가 안 되었을 때만 스캔 활성화
+        if (!isGameOver) {
+            scanActive = true;
+            for(let i=0; i<7; i++) renderSeat(i);
+            
+            setTimeout(() => {
+                if(!isGameOver) btn.disabled = false;
+            }, 6000);
+        }
     }
 
-    // Start
-    initGame();
+    function updateGauge() {
+        if (awkwardness > 100) awkwardness = 100;
+        document.getElementById('awkward-bar').style.width = awkwardness + '%';
+        document.getElementById('awkward-text').innerText = awkwardness;
+    }
 
+    function checkGameOver() {
+        if (awkwardness >= 100 && !isGameOver) {
+            isGameOver = true;
+            clearInterval(gameInterval);
+            document.getElementById('train-interior').style.animation = 'none';
+            document.getElementById('ignore-btn').disabled = true;
+            document.getElementById('scan-btn').disabled = true;
+            addLog(`<br><span style="font-size:16px; color:#e74c3c; font-weight:bold;">🚨 민망함 게이지 100% 초과!</span>`);
+            addLog(`"저 사람 빈자리 노리다 실패했네ㅋㅋ" 따가운 시선에 결국 다음 역에서 도망치듯 내립니다... [게임 오버]`);
+            
+            // 게임오버 시 메인 메뉴의 최고 기록 최신화 준비
+            document.getElementById('menu-highscore').innerText = highScore;
+        }
+    }
+
+    function addLog(msg) {
+        const logDiv = document.getElementById('log');
+        logDiv.innerHTML = `${msg}<br>${logDiv.innerHTML}`;
+    }
 </script>
+
 </body>
 </html>
